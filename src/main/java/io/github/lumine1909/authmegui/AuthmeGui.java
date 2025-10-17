@@ -1,5 +1,7 @@
 package io.github.lumine1909.authmegui;
 
+import com.mojang.authlib.GameProfile;
+import com.viaversion.viaversion.api.Via;
 import fr.xephi.authme.api.v3.AuthMeApi;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
@@ -17,13 +19,13 @@ import net.minecraft.network.protocol.common.ClientboundDisconnectPacket;
 import net.minecraft.network.protocol.common.ClientboundShowDialogPacket;
 import net.minecraft.network.protocol.common.ServerboundCustomClickActionPacket;
 import net.minecraft.network.protocol.configuration.ClientboundFinishConfigurationPacket;
-import net.minecraft.network.protocol.handshake.ClientIntentionPacket;
 import net.minecraft.network.protocol.login.ServerboundHelloPacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.dialog.*;
 import net.minecraft.server.dialog.action.CustomAll;
 import net.minecraft.server.dialog.input.TextInput;
 import net.minecraft.server.network.ServerCommonPacketListenerImpl;
+import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
 import org.bukkit.Bukkit;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -42,6 +44,7 @@ public class AuthmeGui extends JavaPlugin implements Listener {
 
     private static final Key KEY = Key.key("authmegui:listener");
     private static final Field field$ServerCommonPacketListenerImpl$closed;
+    private static final Field field$ServerConfigurationPacketListenerImpl$gameProfile;
     private static final Set<String> failedPlayers = new HashSet<>();
 
     private final ConfigHandler config = new ConfigHandler(this);
@@ -50,6 +53,8 @@ public class AuthmeGui extends JavaPlugin implements Listener {
         try {
             field$ServerCommonPacketListenerImpl$closed = ServerCommonPacketListenerImpl.class.getDeclaredField("closed");
             field$ServerCommonPacketListenerImpl$closed.setAccessible(true);
+            field$ServerConfigurationPacketListenerImpl$gameProfile = ServerConfigurationPacketListenerImpl.class.getDeclaredField("gameProfile");
+            field$ServerConfigurationPacketListenerImpl$gameProfile.setAccessible(true);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -71,7 +76,6 @@ public class AuthmeGui extends JavaPlugin implements Listener {
     }
 
     public void injectChannel(Channel channel) {
-
         channel.pipeline().addBefore("packet_handler", "authmegui_handler", new ChannelDuplexHandler() {
             private final Connection connection = (Connection) channel.pipeline().get("packet_handler");
             private String name;
@@ -81,6 +85,13 @@ public class AuthmeGui extends JavaPlugin implements Listener {
             @Override
             public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
                 if (enabled && msg instanceof ClientboundFinishConfigurationPacket) {
+                    GameProfile profile = (GameProfile) field$ServerConfigurationPacketListenerImpl$gameProfile.get(connection.getPacketListener());
+                    if (Via.getAPI().getPlayerVersion(profile.getId()) < 771) {
+                        channel.pipeline().remove("authmegui_handler");
+                        enabled = false;
+                        super.write(ctx, msg, promise);
+                        return;
+                    }
                     field$ServerCommonPacketListenerImpl$closed.set(connection.getPacketListener(), false);
                     ctx.writeAndFlush(buildDialogPacket(name));
                     Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -96,12 +107,6 @@ public class AuthmeGui extends JavaPlugin implements Listener {
 
             @Override
             public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-                if (enabled && msg instanceof ClientIntentionPacket packet) {
-                    if (packet.protocolVersion() < 771) {
-                        channel.pipeline().remove("authmegui_handler");
-                        enabled = false;
-                    }
-                }
                 if (enabled && msg instanceof ServerboundHelloPacket(String name, UUID profileId)) {
                     this.name = name;
                     if (!enabledPlayers.contains(name)) {

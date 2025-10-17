@@ -12,11 +12,13 @@ repositories {
     gradlePluginPortal()
     maven("https://repo.papermc.io/repository/maven-public/")
     maven("https://repo.codemc.org/repository/maven-public/")
+    maven("https://repo.viaversion.com")
 }
 
 dependencies {
     paperweight.paperDevBundle("1.21.8-R0.1-SNAPSHOT")
     compileOnly("fr.xephi:authme:5.6.1-SNAPSHOT")
+    compileOnly("com.viaversion:viaversion-api:5.5.1")
 }
 
 
