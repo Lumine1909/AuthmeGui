@@ -19,6 +19,7 @@ import net.minecraft.network.protocol.common.ClientboundDisconnectPacket;
 import net.minecraft.network.protocol.common.ClientboundShowDialogPacket;
 import net.minecraft.network.protocol.common.ServerboundCustomClickActionPacket;
 import net.minecraft.network.protocol.configuration.ClientboundFinishConfigurationPacket;
+import net.minecraft.network.protocol.configuration.ServerboundFinishConfigurationPacket;
 import net.minecraft.network.protocol.login.ServerboundHelloPacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.dialog.*;
@@ -113,6 +114,9 @@ public class AuthmeGui extends JavaPlugin implements Listener {
                         channel.pipeline().remove("authmegui_handler");
                         enabled = false;
                     }
+                }
+                if (enabled && msg instanceof ServerboundFinishConfigurationPacket && !success) {
+                    return;
                 }
                 if (enabled && msg instanceof ServerboundCustomClickActionPacket(ResourceLocation id, Optional<Tag> payload)) {
                     if (id.toString().equals("authmegui:login") && payload.isPresent()) {
