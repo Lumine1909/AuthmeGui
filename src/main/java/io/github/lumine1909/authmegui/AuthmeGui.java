@@ -98,8 +98,9 @@ public class AuthmeGui extends JavaPlugin implements Listener {
                     Bukkit.getScheduler().runTaskLater(plugin, () -> {
                         if (!success) {
                             ctx.executor().submit(() -> ctx.writeAndFlush(ClientboundFinishConfigurationPacket.INSTANCE));
+                            success = true;
+                            failedPlayers.add(name);
                         }
-                        failedPlayers.add(name);
                     }, 600);
                     return;
                 }
