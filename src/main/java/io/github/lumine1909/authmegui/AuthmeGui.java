@@ -139,7 +139,7 @@ public class AuthmeGui extends JavaPlugin implements Listener {
     private static ClientboundShowDialogPacket buildDialogPacket(String name) {
         var dialog = new MultiActionDialog(
             new CommonDialogData(
-                Component.literal("登录 SenCraft 服务器").withColor(0x66ccff),
+                Component.literal("登录 " + plugin.getConfig().get("server-name", "服务器")).withColor(0x66ccff),
                 Optional.of(Component.literal("欢迎你 " + name).withColor(0xccffcc)),
                 false, true, DialogAction.CLOSE,
                 List.of(),
