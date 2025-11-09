@@ -3,6 +3,8 @@ package io.github.lumine1909.authmegui;
 import com.mojang.authlib.GameProfile;
 import com.viaversion.viaversion.api.Via;
 import fr.xephi.authme.api.v3.AuthMeApi;
+import io.github.lumine1909.reflexion.Class;
+import io.github.lumine1909.reflexion.Field;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -33,7 +35,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.lang.reflect.Field;
 import java.util.*;
 
 public class AuthmeGui extends JavaPlugin implements Listener {
@@ -44,22 +45,12 @@ public class AuthmeGui extends JavaPlugin implements Listener {
     public static Set<String> enabledPlayers;
 
     private static final Key KEY = Key.key("authmegui:listener");
-    private static final Field field$ServerCommonPacketListenerImpl$closed;
-    private static final Field field$ServerConfigurationPacketListenerImpl$gameProfile;
+    private static final Field<Boolean> field$ServerCommonPacketListenerImpl$closed = Class.of(ServerCommonPacketListenerImpl.class).getField("closed", boolean.class).orElseThrow();
+    private static final Field<GameProfile> field$ServerConfigurationPacketListenerImpl$gameProfile = Class.of(ServerConfigurationPacketListenerImpl.class).getField("gameProfile", GameProfile.class).orElseThrow();
     private static final Set<String> failedPlayers = new HashSet<>();
+    private static boolean hasVia;
 
     private final ConfigHandler config = new ConfigHandler(this);
-
-    static {
-        try {
-            field$ServerCommonPacketListenerImpl$closed = ServerCommonPacketListenerImpl.class.getDeclaredField("closed");
-            field$ServerCommonPacketListenerImpl$closed.setAccessible(true);
-            field$ServerConfigurationPacketListenerImpl$gameProfile = ServerConfigurationPacketListenerImpl.class.getDeclaredField("gameProfile");
-            field$ServerConfigurationPacketListenerImpl$gameProfile.setAccessible(true);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
 
     @Override
     public void onEnable() {
@@ -67,6 +58,7 @@ public class AuthmeGui extends JavaPlugin implements Listener {
         enabledPlayers = config.getEnabledPlayers();
         Bukkit.getPluginManager().registerEvents(this, this);
         ChannelInitializeListenerHolder.addListener(KEY, this::injectChannel);
+        hasVia = Bukkit.getPluginManager().getPlugin("ViaVersion") != null;
         new CommandHandler(this);
     }
 
@@ -86,8 +78,8 @@ public class AuthmeGui extends JavaPlugin implements Listener {
             @Override
             public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
                 if (enabled && msg instanceof ClientboundFinishConfigurationPacket) {
-                    GameProfile profile = (GameProfile) field$ServerConfigurationPacketListenerImpl$gameProfile.get(connection.getPacketListener());
-                    if (Via.getAPI().getPlayerVersion(profile.getId()) < 771) {
+                    GameProfile profile = field$ServerConfigurationPacketListenerImpl$gameProfile.get(connection.getPacketListener());
+                    if (hasVia && Via.getAPI().getPlayerVersion(profile.getId()) < 771) {
                         channel.pipeline().remove("authmegui_handler");
                         enabled = false;
                         super.write(ctx, msg, promise);
@@ -98,6 +90,7 @@ public class AuthmeGui extends JavaPlugin implements Listener {
                     Bukkit.getScheduler().runTaskLater(plugin, () -> {
                         if (!success) {
                             ctx.executor().submit(() -> ctx.writeAndFlush(ClientboundFinishConfigurationPacket.INSTANCE));
+                            field$ServerCommonPacketListenerImpl$closed.set(connection.getPacketListener(), true);
                             success = true;
                             failedPlayers.add(name);
                         }
