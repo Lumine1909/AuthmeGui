@@ -5,6 +5,7 @@ import com.viaversion.viaversion.api.Via;
 import fr.xephi.authme.api.v3.AuthMeApi;
 import io.github.lumine1909.reflexion.Class;
 import io.github.lumine1909.reflexion.Field;
+import io.github.lumine1909.reflexion.Method;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -23,13 +24,14 @@ import net.minecraft.network.protocol.common.ServerboundCustomClickActionPacket;
 import net.minecraft.network.protocol.configuration.ClientboundFinishConfigurationPacket;
 import net.minecraft.network.protocol.configuration.ServerboundFinishConfigurationPacket;
 import net.minecraft.network.protocol.login.ServerboundHelloPacket;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.dialog.*;
 import net.minecraft.server.dialog.action.CustomAll;
 import net.minecraft.server.dialog.input.TextInput;
 import net.minecraft.server.network.ServerCommonPacketListenerImpl;
 import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
 import org.bukkit.Bukkit;
+import org.bukkit.Server;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
@@ -45,8 +47,8 @@ public class AuthmeGui extends JavaPlugin implements Listener {
     public static Set<String> enabledPlayers;
 
     private static final Key KEY = Key.key("authmegui:listener");
-    private static final Field<Boolean> field$ServerCommonPacketListenerImpl$closed = Class.of(ServerCommonPacketListenerImpl.class).getField("closed", boolean.class).orElseThrow();
-    private static final Field<GameProfile> field$ServerConfigurationPacketListenerImpl$gameProfile = Class.of(ServerConfigurationPacketListenerImpl.class).getField("gameProfile", GameProfile.class).orElseThrow();
+    private static final Field<Boolean> field$ServerCommonPacketListenerImpl$closed = Field.of(ServerCommonPacketListenerImpl.class, "closed", boolean.class);
+    private static final Field<GameProfile> field$ServerConfigurationPacketListenerImpl$gameProfile = Field.of(ServerConfigurationPacketListenerImpl.class, "gameProfile", GameProfile.class);
     private static final Set<String> failedPlayers = new HashSet<>();
     private static boolean hasVia;
 
@@ -60,6 +62,10 @@ public class AuthmeGui extends JavaPlugin implements Listener {
         ChannelInitializeListenerHolder.addListener(KEY, this::injectChannel);
         hasVia = Bukkit.getPluginManager().getPlugin("ViaVersion") != null;
         new CommandHandler(this);
+
+        Method<Server> method$getServer = Method.of(
+            Bukkit.class, "getServer", Server.class
+        );
     }
 
     @Override
@@ -79,7 +85,7 @@ public class AuthmeGui extends JavaPlugin implements Listener {
             public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
                 if (enabled && msg instanceof ClientboundFinishConfigurationPacket) {
                     GameProfile profile = field$ServerConfigurationPacketListenerImpl$gameProfile.get(connection.getPacketListener());
-                    if (hasVia && Via.getAPI().getPlayerVersion(profile.getId()) < 771) {
+                    if (hasVia && Via.getAPI().getPlayerVersion(profile.id()) < 771) {
                         channel.pipeline().remove("authmegui_handler");
                         enabled = false;
                         super.write(ctx, msg, promise);
@@ -112,7 +118,7 @@ public class AuthmeGui extends JavaPlugin implements Listener {
                 if (enabled && msg instanceof ServerboundFinishConfigurationPacket && !success) {
                     return;
                 }
-                if (enabled && msg instanceof ServerboundCustomClickActionPacket(ResourceLocation id, Optional<Tag> payload)) {
+                if (enabled && msg instanceof ServerboundCustomClickActionPacket(Identifier id, Optional<Tag> payload)) {
                     if (id.toString().equals("authmegui:login") && payload.isPresent()) {
                         String password = ((CompoundTag) payload.get()).getStringOr("password", "");
                         if (AuthMeApi.getInstance().checkPassword(name, password)) {
@@ -145,11 +151,11 @@ public class AuthmeGui extends JavaPlugin implements Listener {
             ),
             List.of(new ActionButton(
                 new CommonButtonData(Component.literal("登录"), Optional.empty(), 100),
-                Optional.of(new CustomAll(ResourceLocation.parse("authmegui:login"), Optional.empty()))
+                Optional.of(new CustomAll(Identifier.parse("authmegui:login"), Optional.empty()))
             )),
             Optional.of(new ActionButton(
                 new CommonButtonData(Component.literal("退出"), Optional.empty(), 100),
-                Optional.of(new CustomAll(ResourceLocation.parse("authmegui:quit"), Optional.empty()))
+                Optional.of(new CustomAll(Identifier.parse("authmegui:quit"), Optional.empty()))
             )),
             3
         );
