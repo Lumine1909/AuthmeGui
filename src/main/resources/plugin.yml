@@ -1,0 +1,10 @@
+name: AuthmeGui
+version: 1.1-SNAPSHOT
+main: io.github.lumine1909.authmegui.AuthmeGui
+api-version: 1.21
+depends:
+  - AuthMe
+authors:
+  - Lumine1909
+commands:
+  authmegui:
