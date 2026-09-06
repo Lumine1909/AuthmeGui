@@ -1,5 +1,6 @@
 package io.github.lumine1909.authmegui;
 
+import com.destroystokyo.paper.event.player.PlayerConnectionCloseEvent;
 import com.mojang.authlib.GameProfile;
 import com.viaversion.viaversion.api.Via;
 import fr.xephi.authme.api.v3.AuthMeApi;
@@ -29,7 +30,6 @@ import net.minecraft.server.dialog.input.TextInput;
 import net.minecraft.server.network.ServerCommonPacketListenerImpl;
 import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
 import org.bukkit.Bukkit;
-import org.bukkit.Server;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
@@ -166,5 +166,10 @@ public class AuthmeGui extends JavaPlugin implements Listener {
             Bukkit.getScheduler().runTaskLater(plugin, () -> e.getPlayer().sendMessage(net.kyori.adventure.text.Component.text("[AuthmeGui] Gui登录超时, 如果你没有看到登录Gui, 请报告管理员", NamedTextColor.RED)), 10);
             failedPlayers.remove(e.getPlayer().getName());
         }
+    }
+
+    @EventHandler
+    public void onDisconnect(PlayerConnectionCloseEvent e) {
+        preLoginPlayers.remove(e.getPlayerName());
     }
 }
